@@ -70,6 +70,28 @@ namespace Megaphone
             audioSource.Stop();
         }
 
+        public void PauseAudio(AudioSource audioSource)
+        {
+            if (!audioSource.isPlaying)
+            {
+                Debug.LogWarning($"{audioSource} is not playing a audio clip so it cannot be paused.");
+                return;
+            }
+
+            audioSource.Pause();
+        }
+
+        public void PlayAudio(AudioSource audioSource)
+        {
+            if(audioSource.isPlaying)
+            {
+                Debug.LogWarning($"{audioSource} is already playing a audio clip so it cannot be unpaused.");
+                return;
+            }
+
+            audioSource.Play();
+        }
+
         public void PauseAudioForSeconds(AudioSource audioSource, float timeSeconds)
         {
             if (!audioSource.isPlaying)
@@ -101,7 +123,7 @@ namespace Megaphone
 
         public void QueueAudio(AudioSource audioSource, AudioClip audioClip)
         {
-            if (audioSource.isPlaying)
+            if (audioSource.isPlaying && _audioQueues[audioSource].Queue == null)
                 audioSource.Stop();
 
             _audioQueueClips.TryAdd(audioSource, new());
@@ -112,6 +134,13 @@ namespace Megaphone
 
         public void QueueAudioPreset(AudioSource audioSource, string audioPreset)
             => QueueAudio(audioSource, _library.GetAudioPreset(audioPreset).audioClip);
+
+
+        public void QueueAudioList(AudioSource audioSource, List<AudioClip> audioClips)
+        {
+            for (int i = 0; i < audioClips.Count; i++)
+                QueueAudio(audioSource, audioClips[i]);
+        }
 
         public void QueueSkip(AudioSource audioSource)
         {
@@ -127,10 +156,12 @@ namespace Megaphone
 
         public void QueuePause(AudioSource audioSource)
         {
+            //TODO:
         }
 
         public void QueuePlay(AudioSource audioSource)
         {
+            //TODO:
         }
 
         private IEnumerator PauseAudio(AudioSource audioSource, float timeSeconds)
