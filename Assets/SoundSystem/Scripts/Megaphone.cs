@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -42,10 +43,6 @@ namespace Megaphone
 
         private MegaphoneLibrary _library;
 
-        private Dictionary<AudioSource, List<AudioClip>> _audioQueueClips = new();
-
-        private Dictionary<AudioSource, AudioQueueItem> _audioQueues = new();
-
         public AudioClip AudioClip(string presetName) => _library.GetAudioPreset(presetName).audioClip;
 
         private void Awake()
@@ -53,115 +50,83 @@ namespace Megaphone
             _library = GetComponent<MegaphoneLibrary>();
         }
 
-        public void PlayAudio(AudioSource audioSource, AudioClip audioClip)
+        public void Play(MegaphoneSpeaker megaphoneSpeaker, AudioClip audioClip)
         {
-            if (audioSource.isPlaying)
-                audioSource.Stop();
+            if (megaphoneSpeaker.IsPlaying)
+                megaphoneSpeaker.Stop();
 
-            audioSource.clip = audioClip;
-            audioSource.Play();
+            megaphoneSpeaker.Clip = audioClip;
+            megaphoneSpeaker.Play();
         }
 
-        public void StopAudio(AudioSource audioSource)
+        public void Stop(MegaphoneSpeaker megaphoneSpeaker)
         {
-            if (!audioSource.isPlaying)
-                return;
-
-            audioSource.Stop();
-        }
-
-        public void PauseAudio(AudioSource audioSource)
-        {
-            if (!audioSource.isPlaying)
+            if (!megaphoneSpeaker.IsPlaying)
             {
-                Debug.LogWarning($"{audioSource} is not playing a audio clip so it cannot be paused.");
+                Debug.LogWarning($"{megaphoneSpeaker} is not playing a audio clip so it cannot be stopped.");
                 return;
             }
 
-            audioSource.Pause();
+            megaphoneSpeaker.Stop();
+            megaphoneSpeaker.Clip = null;
         }
 
-        public void PlayAudio(AudioSource audioSource)
+        public void Loop(MegaphoneSpeaker megaphoneSpeaker, AudioClip audioClip) 
         {
-            if(audioSource.isPlaying)
+            megaphoneSpeaker.Clip = audioClip;
+            megaphoneSpeaker.IsLooping = true;
+            megaphoneSpeaker.Play();
+        }
+
+        public void Pause(MegaphoneSpeaker megaphoneSpeaker)
+        {
+            if (!megaphoneSpeaker.IsPlaying)
             {
-                Debug.LogWarning($"{audioSource} is already playing a audio clip so it cannot be unpaused.");
+                Debug.LogWarning($"{megaphoneSpeaker} is not playing a audio clip so it cannot be paused.");
                 return;
             }
 
-            audioSource.Play();
+            megaphoneSpeaker.Pause();
         }
 
-        public void PauseAudioForSeconds(AudioSource audioSource, float timeSeconds)
+        public void Play(MegaphoneSpeaker megaphoneSpeaker)
         {
-            if (!audioSource.isPlaying)
+            if (megaphoneSpeaker.IsPlaying)
             {
-                Debug.LogWarning($"{audioSource} is not playing a audio clip so it cannot be paused.");
+                Debug.LogWarning($"{megaphoneSpeaker} is already playing a audio clip so it cannot be unpaused.");
                 return;
             }
 
-            StartCoroutine(PauseAudio(audioSource, timeSeconds));
+            megaphoneSpeaker.Play();
         }
 
-        public void PlayAudioPreset(AudioSource audioSource, string audioPreset)
+        public void PauseForSeconds(MegaphoneSpeaker megaphoneSpeaker, float timeSeconds)
         {
-            if (audioSource.isPlaying)
-                audioSource.Stop();
-
-            audioSource.clip = _library.GetAudioPreset(audioPreset).audioClip;
-            audioSource.Play();
-        }
-
-        public void PlayAudioPresetId(AudioSource audioSource, int id)
-        {
-            if (audioSource.isPlaying)
-                audioSource.Stop();
-
-            audioSource.clip = _library.GetSoundPresetById(id).audioClip;
-            audioSource.Play();
-        }
-
-        public void QueueAudio(AudioSource audioSource, AudioClip audioClip)
-        {
-            if (audioSource.isPlaying && _audioQueues[audioSource].Queue == null)
-                audioSource.Stop();
-
-            _audioQueueClips.TryAdd(audioSource, new());
-            _audioQueueClips[audioSource].Add(audioClip);
-
-            _audioQueues[audioSource] = new AudioQueueItem { Queue = StartCoroutine(StartAudioQueue(audioSource)) };
-        }
-
-        public void QueueAudioPreset(AudioSource audioSource, string audioPreset)
-            => QueueAudio(audioSource, _library.GetAudioPreset(audioPreset).audioClip);
-
-
-        public void QueueAudioList(AudioSource audioSource, List<AudioClip> audioClips)
-        {
-            for (int i = 0; i < audioClips.Count; i++)
-                QueueAudio(audioSource, audioClips[i]);
-        }
-
-        public void QueueSkip(AudioSource audioSource)
-        {
-            if (_audioQueues[audioSource].PlayingAudio == null)
+            if (!megaphoneSpeaker.IsPlaying)
             {
-                Debug.LogWarning($"{audioSource} there is currently nothing to be skipped.");
+                Debug.LogWarning($"{megaphoneSpeaker} is not playing a audio clip so it cannot be paused.");
                 return;
             }
 
-            StopCoroutine(_audioQueues[audioSource].PlayingAudio);
-            _audioQueues[audioSource].PlayingAudio = null;
+            StartCoroutine(PauseAudio(megaphoneSpeaker.AudioSource, timeSeconds));
         }
 
-        public void QueuePause(AudioSource audioSource)
+        public void PlayPreset(MegaphoneSpeaker megaphoneSpeaker, string audioPreset)
         {
-            //TODO:
+            if (megaphoneSpeaker.IsPlaying)
+                megaphoneSpeaker.Stop();
+
+            megaphoneSpeaker.Clip = _library.GetAudioPreset(audioPreset).audioClip;
+            megaphoneSpeaker.Play();
         }
 
-        public void QueuePlay(AudioSource audioSource)
+        public void PlayPresetId(MegaphoneSpeaker megaphoneSpeaker, int id)
         {
-            //TODO:
+            if (megaphoneSpeaker.IsPlaying)
+                megaphoneSpeaker.Stop();
+
+            megaphoneSpeaker.Clip = _library.GetSoundPresetById(id).audioClip;
+            megaphoneSpeaker.Play();
         }
 
         private IEnumerator PauseAudio(AudioSource audioSource, float timeSeconds)
@@ -171,28 +136,89 @@ namespace Megaphone
             audioSource.UnPause();
         }
 
-        private IEnumerator StartAudioQueue(AudioSource audioSource)
-        {
-            yield return new WaitUntil(() => _audioQueues.ContainsKey(audioSource));
+        /*#region Queue
 
-            while (_audioQueueClips[audioSource].Count > 0)
+        private Dictionary<MegaphoneSpeaker, List<AudioClip>> _audioQueueClips = new();
+
+        private Dictionary<MegaphoneSpeaker, AudioQueueItem> _audioQueues = new();
+
+        public void QueueClip(MegaphoneSpeaker megaphoneSpeaker, AudioClip audioClip)
+        {
+            if (megaphoneSpeaker.IsPlaying && _audioQueues[megaphoneSpeaker].Queue == null)
+                megaphoneSpeaker.Stop();
+
+            _audioQueueClips.TryAdd(megaphoneSpeaker, new());
+            _audioQueueClips[megaphoneSpeaker].Add(audioClip);
+
+            _audioQueues[megaphoneSpeaker] = new AudioQueueItem { Queue = StartCoroutine(StartAudioQueue(megaphoneSpeaker)) };
+        }
+
+        public void QueuePreset(MegaphoneSpeaker megaphoneSpeaker, string audioPreset)
+            => QueueClip(megaphoneSpeaker, _library.GetAudioPreset(audioPreset).audioClip);
+
+
+        public void QueueClipList(MegaphoneSpeaker megaphoneSpeaker, List<AudioClip> audioClips)
+        {
+            for (int i = 0; i < audioClips.Count; i++)
+                QueueClip(megaphoneSpeaker, audioClips[i]);
+        }
+
+        public void Skip(MegaphoneSpeaker megaphoneSpeaker)
+        {
+            if (_audioQueues[megaphoneSpeaker].PlayingAudio == null)
             {
-                _audioQueues[audioSource].PlayingAudio = StartCoroutine(PlayAudioQeueItem(audioSource, _audioQueueClips[audioSource][0]));
-                yield return new WaitUntil(() => _audioQueues[audioSource].PlayingAudio == null);
-                _audioQueueClips[audioSource].RemoveAt(0);
+                Debug.LogWarning($"{megaphoneSpeaker} there is currently nothing to be skipped.");
+                return;
             }
 
-            _audioQueues[audioSource].Queue = null;
+            StopCoroutine(_audioQueues[megaphoneSpeaker].PlayingAudio);
+            _audioQueues[megaphoneSpeaker].PlayingAudio = null;
         }
 
-        private IEnumerator PlayAudioQeueItem(AudioSource audioSource, AudioClip audioClip)
+        public void QueuePause(MegaphoneSpeaker megaphoneSpeaker)
         {
-            audioSource.clip = audioClip;
-            audioSource.Play();
-
-            yield return new WaitForSeconds(audioClip.length);
-
-            _audioQueues[audioSource].PlayingAudio = null;
+            //TODO:
         }
+
+        public void QueuePlay(MegaphoneSpeaker megaphoneSpeaker)
+        {
+            //TODO:
+        }
+
+        private IEnumerator StartAudioQueue(MegaphoneSpeaker megaphoneSpeaker)
+        {
+            yield return new WaitUntil(() => _audioQueues.ContainsKey(megaphoneSpeaker));
+
+            while (_audioQueueClips[megaphoneSpeaker].Count > 0)
+            {
+                _audioQueues[megaphoneSpeaker].PlayingAudio = StartCoroutine(PlayAudioQeueItem(megaphoneSpeaker, _audioQueueClips[megaphoneSpeaker][0]));
+                yield return new WaitUntil(() => _audioQueues[megaphoneSpeaker].PlayingAudio == null);
+                _audioQueueClips[megaphoneSpeaker].RemoveAt(0);
+            }
+
+            _audioQueues[megaphoneSpeaker].Queue = null;
+        }
+
+        private IEnumerator PlayAudioQeueItem(MegaphoneSpeaker megaphoneSpeaker, AudioClip audioClip)
+        {
+            megaphoneSpeaker.Clip = audioClip;
+            megaphoneSpeaker.Play();
+
+            bool isFinished = false;
+
+            Action onFinish = () =>
+            {
+                isFinished = true;
+            };
+
+            megaphoneSpeaker.onFinish += onFinish;
+
+            yield return new WaitUntil(() => isFinished == true);
+
+            megaphoneSpeaker.onFinish -= onFinish;
+
+            _audioQueues[megaphoneSpeaker].PlayingAudio = null;
+        }
+        #endregion*/
     }
 }
